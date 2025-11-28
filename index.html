@@ -797,6 +797,22 @@
       <h2><i class="fas fa-list-ol"></i> 请选择题目数量</h2>
       <p>题库总数：955题</p>
       <input type="number" id="question-count-input" class="question-count-input" min="1" max="955" placeholder="请输入题目数量（1-955）" autofocus>
+      
+      <!-- 背题模式的顺序选择 -->
+      <div id="memorize-order-selection" style="display: none; margin: 15px 0;">
+          <label style="display: block; margin-bottom: 5px; font-weight: 500;">出题顺序：</label>
+          <div style="display: flex; gap: 10px; justify-content: center;">
+              <label style="display: flex; align-items: center; cursor: pointer; padding: 10px 20px; border: 2px solid #e6eef5; border-radius: 8px; transition: all 0.3s;">
+                  <input type="radio" name="memorize-order" value="sequential" checked style="margin-right: 8px; transform: scale(1.2);">
+                  <span><i class="fas fa-sort-numeric-down"></i> 顺序背题</span>
+              </label>
+              <label style="display: flex; align-items: center; cursor: pointer; padding: 10px 20px; border: 2px solid #e6eef5; border-radius: 8px; transition: all 0.3s;">
+                  <input type="radio" name="memorize-order" value="random" style="margin-right: 8px; transform: scale(1.2);">
+                  <span><i class="fas fa-random"></i> 随机乱序</span>
+              </label>
+          </div>
+      </div>
+      
       <button id="question-count-submit" class="btn"><i class="fas fa-play"></i> 开始练习</button>
       <div id="count-error-message" class="error-message"><i class="fas fa-exclamation-circle"></i> 请输入有效的题目数量！</div>
   </div>
@@ -5905,6 +5921,8 @@
           currentModeDisplay.innerHTML = '<i class="fas fa-book"></i> 练习模式 - 答题后可立即查看答案';
           currentModeDisplay.style.color = '#27ae60';
           updateQuestionCountDisplay();
+          // 隐藏背题模式的顺序选择
+          document.getElementById('memorize-order-selection').style.display = 'none';
       });
 
       examModeBtn.addEventListener('click', function() {
@@ -5914,6 +5932,8 @@
           currentModeDisplay.innerHTML = '<i class="fas fa-clipboard-check"></i> 考试模式 - 提交后统一查看结果';
           currentModeDisplay.style.color = '#3498db';
           updateQuestionCountDisplay();
+          // 隐藏背题模式的顺序选择
+          document.getElementById('memorize-order-selection').style.display = 'none';
       });
 
       stageModeBtn.addEventListener('click', function() {
@@ -6624,7 +6644,8 @@
               <!-- 所有题目动态生成 -->
           </div>
           
-          <div style="text-align: center; margin: 30px 0;">
+          <div style="text-align: center; margin: 30px 0; display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
+              <button id="calibrate-reset" class="btn" style="background: linear-gradient(135deg, #f39c12, #e67e22);"><i class="fas fa-undo"></i> 重置为原始答案</button>
               <button id="calibrate-back" class="btn btn-danger"><i class="fas fa-arrow-left"></i> 返回模式选择</button>
           </div>
       </div>
@@ -6652,22 +6673,42 @@
       // 背题模式相关变量
       let memorizeQuestions = [];
 
-      // 从localStorage获取校准后的答案
+      // 从localStorage获取校准后的答案（带章节标识）
       function getCalibratedAnswer(questionId) {
-          const calibrated = localStorage.getItem('calibratedAnswers');
+          const storageKey = `calibratedAnswers_${currentChapter}`;
+          const calibrated = localStorage.getItem(storageKey);
           if (calibrated) {
-              const answers = JSON.parse(calibrated);
-              return answers[questionId] || null;
+              try {
+                  const answers = JSON.parse(calibrated);
+                  return answers[questionId] || null;
+              } catch (e) {
+                  console.error('解析校准答案失败:', e);
+                  return null;
+              }
           }
           return null;
       }
 
-      // 保存校准的答案到localStorage
+      // 保存校准的答案到localStorage（带章节标识）
       function saveCalibratedAnswer(questionId, answer) {
-          let calibrated = localStorage.getItem('calibratedAnswers');
+          const storageKey = `calibratedAnswers_${currentChapter}`;
+          let calibrated = localStorage.getItem(storageKey);
           let answers = calibrated ? JSON.parse(calibrated) : {};
           answers[questionId] = answer;
-          localStorage.setItem('calibratedAnswers', JSON.stringify(answers));
+          try {
+              localStorage.setItem(storageKey, JSON.stringify(answers));
+              console.log(`已保存题目 ${questionId} 的校准答案:`, answer);
+          } catch (e) {
+              console.error('保存校准答案失败:', e);
+              alert('保存失败，可能是浏览器存储空间不足');
+          }
+      }
+      
+      // 清除当前章节的所有校准数据
+      function clearCalibratedAnswers() {
+          const storageKey = `calibratedAnswers_${currentChapter}`;
+          localStorage.removeItem(storageKey);
+          console.log(`已清除 ${currentChapter} 的校准数据`);
       }
 
       // 获取题目的最终答案（优先使用校准答案）
@@ -6682,13 +6723,21 @@
           form.innerHTML = '';
           document.getElementById('calibrate-total').textContent = originalQuestions.length;
           
+          console.log('当前章节:', currentChapter);
+          console.log('题库数量:', originalQuestions.length);
+          
           originalQuestions.forEach((q, index) => {
               const questionDiv = document.createElement('div');
               questionDiv.className = 'question fade-in';
               questionDiv.id = `calibrate-q-${q.id}`;
               
               const finalAnswer = getFinalAnswer(q);
-              const isMultipleChoice = finalAnswer && finalAnswer.includes(' ');
+              // 确保答案存在且有效
+              const safeAnswer = finalAnswer || q.answer || '';
+              
+              console.log(`题目${q.id}: 原始答案=${q.answer}, 校准答案=${finalAnswer}, 最终答案=${safeAnswer}`);
+              
+              const isMultipleChoice = safeAnswer && safeAnswer.includes(' ');
               const inputType = isMultipleChoice ? 'checkbox' : 'radio';
               const inputName = `calibrate-answer-${q.id}`;
               
@@ -6696,8 +6745,8 @@
               q.options.forEach(option => {
                   const optionLetter = option.charAt(0);
                   const isSelected = isMultipleChoice 
-                      ? finalAnswer.split(' ').includes(optionLetter)
-                      : finalAnswer === optionLetter;
+                      ? safeAnswer.split(' ').includes(optionLetter)
+                      : safeAnswer === optionLetter;
                   const checked = isSelected ? 'checked' : '';
                   
                   optionsHtml += `
@@ -6732,7 +6781,7 @@
                   </div>
                   <div style="margin-top: 15px; padding: 10px; background: #f7f9fc; border-radius: 6px;">
                       <p style="margin: 5px 0;"><strong>原始答案：</strong>${q.answer}</p>
-                      <p style="margin: 5px 0;"><strong>当前答案：</strong><span id="current-answer-${q.id}">${finalAnswer}</span></p>
+                      <p style="margin: 5px 0;"><strong>当前答案：</strong><span id="current-answer-${q.id}">${safeAnswer}</span></p>
                   </div>
               `;
               form.appendChild(questionDiv);
@@ -6837,9 +6886,18 @@
           chapterSelection.classList.remove('hidden');
           hideInterruptBtn(); // 隐藏中断按钮
       });
+      
+      // 重置校准按钮
+      document.getElementById('calibrate-reset').addEventListener('click', function() {
+          if (confirm('确定要将当前章节的所有校准答案重置为原始答案吗？\n此操作不可撤销！')) {
+              clearCalibratedAnswers();
+              alert('已重置为原始答案，页面将刷新。');
+              renderAllCalibrateQuestions(); // 重新渲染
+          }
+      });
 
       // 渲染背题模式（一次性显示所有题目）
-      function renderAllMemorizeQuestions() {
+      function renderAllMemorizeQuestions(isRandom = true) {
           const form = document.getElementById('memorize-form');
           form.innerHTML = '';
           document.getElementById('memorize-total').textContent = memorizeQuestions.length;
@@ -6869,9 +6927,12 @@
               
               const questionTypeLabel = isMultipleChoice ? '<span class="question-type">[多选题]</span>' : '';
               
+              // 顺序模式显示实际题号，乱序模式显示序号
+              const questionNumber = isRandom ? (index + 1) : q.id;
+              
               questionDiv.innerHTML = `
                   <div class="question-title">
-                      <span class="question-number">${index + 1}. </span>
+                      <span class="question-number">${questionNumber}. </span>
                       ${questionTypeLabel}
                       ${q.question}
                   </div>
@@ -6903,6 +6964,9 @@
           currentModeDisplay.innerHTML = '<i class="fas fa-brain"></i> 背题模式 - 直接查看答案';
           currentModeDisplay.style.color = '#9b59b6';
           updateQuestionCountDisplay();
+          
+          // 显示背题模式的顺序选择
+          document.getElementById('memorize-order-selection').style.display = 'block';
       });
 
       // 修改原有的questionCountSubmit逻辑以支持背题模式
@@ -6920,11 +6984,24 @@
               examContent.classList.add('hidden'); // 确保考试内容区域被隐藏
               document.getElementById('memorize-content').classList.remove('hidden');
               
-              // 打乱题库并选择题目
-              const shuffled = shuffle(originalQuestions.slice());
-              memorizeQuestions = shuffled.slice(0, count);
-              renderAllMemorizeQuestions();
+              // 获取顺序选择
+              const orderType = document.querySelector('input[name="memorize-order"]:checked').value;
+              const isRandom = orderType === 'random';
+              
+              if (isRandom) {
+                  // 随机乱序
+                  const shuffled = shuffle(originalQuestions.slice());
+                  memorizeQuestions = shuffled.slice(0, count);
+              } else {
+                  // 顺序背题
+                  memorizeQuestions = originalQuestions.slice(0, count);
+              }
+              
+              renderAllMemorizeQuestions(isRandom);
               showInterruptBtn(); // 显示中断按钮
+              
+              // 隐藏顺序选择选项
+              document.getElementById('memorize-order-selection').style.display = 'none';
           } else {
               // 练习或考试模式（原有逻辑）
               document.getElementById('results').style.display = 'none';
