@@ -6652,35 +6652,22 @@
       // 背题模式相关变量
       let memorizeQuestions = [];
 
-      // 从localStorage获取校准后的答案（带章节标识）
+      // 从localStorage获取校准后的答案
       function getCalibratedAnswer(questionId) {
-          const storageKey = `calibratedAnswers_${currentChapter}`;
-          const calibrated = localStorage.getItem(storageKey);
+          const calibrated = localStorage.getItem('calibratedAnswers');
           if (calibrated) {
-              try {
-                  const answers = JSON.parse(calibrated);
-                  return answers[questionId] || null;
-              } catch (e) {
-                  console.error('解析校准答案失败:', e);
-                  return null;
-              }
+              const answers = JSON.parse(calibrated);
+              return answers[questionId] || null;
           }
           return null;
       }
 
-      // 保存校准的答案到localStorage（带章节标识）
+      // 保存校准的答案到localStorage
       function saveCalibratedAnswer(questionId, answer) {
-          const storageKey = `calibratedAnswers_${currentChapter}`;
-          let calibrated = localStorage.getItem(storageKey);
+          let calibrated = localStorage.getItem('calibratedAnswers');
           let answers = calibrated ? JSON.parse(calibrated) : {};
           answers[questionId] = answer;
-          try {
-              localStorage.setItem(storageKey, JSON.stringify(answers));
-              console.log(`已保存题目 ${questionId} 的校准答案:`, answer);
-          } catch (e) {
-              console.error('保存校准答案失败:', e);
-              alert('保存失败，可能是浏览器存储空间不足');
-          }
+          localStorage.setItem('calibratedAnswers', JSON.stringify(answers));
       }
 
       // 获取题目的最终答案（优先使用校准答案）
